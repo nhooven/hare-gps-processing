@@ -1,0 +1,302 @@
+# Project: WSU Snowshoe Hare and PCT Project
+# Subproject: GPS processing
+# Script: 01 - Error model
+# Author: Nathan D. Hooven, Graduate Research Assistant
+# Email: nathan.hooven@wsu.edu / nathan.d.hooven@gmail.com
+# Date began: 17 Jun 2023
+# Date completed: 17 Jun 2023
+# Date last modified: 17 Mar 2025
+# R version: 4.2.2  
+
+#_______________________________________________________________________________________________
+# 1. Load required packages ----
+#_______________________________________________________________________________________________
+
+library(tidyverse)       # manipulate and clean data
+library(lubridate)       # easily work with dates
+library(sf)              # spatial data manipulation
+library(amt)             # work with movement data
+library(ctmm)            # error model
+
+#_______________________________________________________________________________________________
+# 2. Read in data ----
+
+# due to the GPS csv format, must specify "" separator and fill all columns
+
+#_______________________________________________________________________________________________
+
+# directory
+gps.dir <- "E:/Hare project/GPS data/testdata_2022/"
+
+data.1 <- read.csv(paste0(gps.dir, "22Y001_S2.csv"), sep = "", fill = TRUE)
+data.2 <- read.csv(paste0(gps.dir, "22Y002_S1.csv"), sep = "", fill = TRUE)
+data.3 <- read.csv(paste0(gps.dir, "22Y003_S1.csv"), sep = "", fill = TRUE)
+data.4 <- read.csv(paste0(gps.dir, "22Y004_S1.csv"), sep = "", fill = TRUE)
+data.5 <- read.csv(paste0(gps.dir, "22Y005_S1.csv"), sep = "", fill = TRUE)
+data.6 <- read.csv(paste0(gps.dir, "22Y006_S1.csv"), sep = "", fill = TRUE)
+data.7 <- read.csv(paste0(gps.dir, "22Y007_S2.csv"), sep = "", fill = TRUE)
+data.8 <- read.csv(paste0(gps.dir, "22Y008_S1.csv"), sep = "", fill = TRUE)
+data.9 <- read.csv(paste0(gps.dir, "22Y009_S1.csv"), sep = "", fill = TRUE)
+data.10 <- read.csv(paste0(gps.dir, "22Y010_S1.csv"), sep = "", fill = TRUE)
+data.11 <- read.csv(paste0(gps.dir, "22Y011_S1.csv"), sep = "", fill = TRUE)
+data.12 <- read.csv(paste0(gps.dir, "22Y012_S1.csv"), sep = "", fill = TRUE)
+data.13 <- read.csv(paste0(gps.dir, "22Y013_S1.csv"), sep = "", fill = TRUE)
+data.14 <- read.csv(paste0(gps.dir, "22Y014_S1.csv"), sep = "", fill = TRUE)
+data.15 <- read.csv(paste0(gps.dir, "22Y015_S2.csv"), sep = "", fill = TRUE)
+data.16 <- read.csv(paste0(gps.dir, "22Y016_S1.csv"), sep = "", fill = TRUE)
+data.17 <- read.csv(paste0(gps.dir, "22Y017_S1.csv"), sep = "", fill = TRUE)
+data.18 <- read.csv(paste0(gps.dir, "22Y018_S1.csv"), sep = "", fill = TRUE)
+data.19 <- read.csv(paste0(gps.dir, "22Y019_S1.csv"), sep = "", fill = TRUE)
+data.20 <- read.csv(paste0(gps.dir, "22Y020_S2.csv"), sep = "", fill = TRUE)
+
+#_______________________________________________________________________________________________
+# 2. Bind together, keep only relocation rows, and columns we need ----
+#_______________________________________________________________________________________________
+
+# bind together
+all.data <- rbind(data.1, data.2, data.3, data.4, data.5,
+                  data.6, data.7, data.8, data.9, data.10,
+                  data.11, data.12, data.13, data.14, data.15,
+                  data.16, data.17, data.18, data.19, data.20)
+
+# keep only relocation rows
+all.data <- all.data %>% 
+  
+  drop_na(hdop) %>%
+  
+  # select only columns we need
+  dplyr::select(TagID, 
+                Date, 
+                Time, 
+                location.lat, 
+                location.lon, 
+                height.msl,
+                ground.speed, 
+                satellites, 
+                hdop, 
+                signal.strength)
+
+#_______________________________________________________________________________________________
+# 3. Create telemetry objects for error modeling ----
+#_______________________________________________________________________________________________
+
+# create timestamp
+all.data.1 <- all.data %>% 
+  
+  mutate(timestamp = mdy_hms(paste(Date, Time),
+                             tz = "UTC")) %>%
+  
+  # select only columns we need
+  dplyr::select(TagID, 
+                timestamp, 
+                location.lat, 
+                location.lon, 
+                height.msl,
+                ground.speed, 
+                satellites, 
+                hdop, 
+                signal.strength)
+
+# make telemetry objects - loop through all and pack into list
+all.telemetry <- list()
+
+tag.list <- unique(all.data.1$TagID)
+
+for (i in 1:length(tag.list)) {
+  
+  indiv.tag <- tag.list[i]
+  
+  # subset only one tag
+  tag.data <- all.data.1 %>% filter(TagID == indiv.tag)
+  
+  # make a track
+  tag.track <- make_track(tag.data, 
+                          .x = location.lon, 
+                          .y = location.lat, 
+                          .t = timestamp,
+                          crs = 4326,          # WGS84 lat/long
+                          all_cols = TRUE)
+  
+  # rename columns for Movebank naming conventions
+  names(tag.data) <- c("tag.local.identifier",
+                       "timestamp",
+                       "location.lat",
+                       "location.long",
+                       "height above mean sea level",
+                       "ground speed",
+                       "GPS satellite count",
+                       "GPS HDOP",
+                       "GPS maximum signal strength")
+  
+  # create a telemetry object
+  tag.telem <- as.telemetry(object = tag.data,
+                            timeformat = "auto",
+                            timezone = "UTC",
+                            keep = TRUE)
+  
+  # subset for model fitting
+  tag.telem.1 <- tag.telem[ , c(1:5, 14, 16:18)]
+  
+  # change n satellites to "class" column
+  tag.telem.1$class <- as.factor(ifelse(tag.telem.1$GPS.satellite.count > 3,
+                                        "3D",
+                                        "2D"))
+  
+  # build into list
+  all.telemetry[[i]] <- tag.telem.1
+  
+}
+
+#_______________________________________________________________________________________________
+# 4. Plot to examine error ----
+
+# create sf object
+all.data.sf <- all.data.1 %>%
+  
+  st_as_sf(coords = c("location.lon",
+                      "location.lat"),
+           crs = "EPSG:4326") %>%
+  
+  st_transform(crs = "EPSG:32611")
+
+#_______________________________________________________________________________________________
+# 4a. By n satellites ----
+#_______________________________________________________________________________________________
+
+ggplot() +
+  
+  theme_bw() +
+  
+  # by satellites
+  facet_wrap(~ satellites) +
+  
+  geom_sf(data = all.data.sf,
+             aes(size = hdop,
+                 color = satellites),
+             alpha = 0.35) +
+  
+  geom_point(data = data.frame(x = 304899.43,
+                               y = 5403550.25),
+             aes(x = x,
+                 y = y),
+             color = "red",
+             shape = 21,
+             size = 4) +
+  
+  coord_sf(datum = st_crs(32611),
+           xlim = c(304860,
+                    304940),
+           ylim = c(5403505,
+                    5403600)) +
+  
+  scale_color_viridis_d()
+
+#_______________________________________________________________________________________________
+# 4b. First 10 devices ----
+#_______________________________________________________________________________________________
+
+all.data.sf.1 <- all.data.sf %>%
+  
+  filter(TagID %in% unique(all.data.sf$TagID)[1:10])
+
+ggplot() +
+  
+  theme_bw() +
+  
+  # by satellites
+  facet_wrap(~ TagID) +
+  
+  geom_sf(data = all.data.sf.1,
+          aes(size = hdop,
+              color = satellites),
+          alpha = 0.35) +
+  
+  geom_point(data = data.frame(x = 304899.43,
+                               y = 5403550.25),
+             aes(x = x,
+                 y = y),
+             color = "red",
+             shape = 21,
+             size = 4) +
+  
+  coord_sf(datum = st_crs(32611),
+           xlim = c(304860,
+                    304940),
+           ylim = c(5403505,
+                    5403600)) +
+  
+  scale_color_viridis_d()
+
+#_______________________________________________________________________________________________
+# 4c. Second 10 devices ----
+#_______________________________________________________________________________________________
+
+all.data.sf.2 <- all.data.sf %>%
+  
+  filter(TagID %in% unique(all.data.sf$TagID)[11:20])
+
+ggplot() +
+  
+  theme_bw() +
+  
+  # by satellites
+  facet_wrap(~ TagID) +
+  
+  geom_sf(data = all.data.sf.2,
+          aes(size = hdop,
+              color = satellites),
+          alpha = 0.35) +
+  
+  geom_point(data = data.frame(x = 304899.43,
+                               y = 5403550.25),
+             aes(x = x,
+                 y = y),
+             color = "red",
+             shape = 21,
+             size = 4) +
+  
+  coord_sf(datum = st_crs(32611),
+           xlim = c(304860,
+                    304940),
+           ylim = c(5403505,
+                    5403600)) +
+  
+  scale_color_viridis_d()
+
+#_______________________________________________________________________________________________
+# 5. Fit error model ----
+#_______________________________________________________________________________________________
+
+# here, we'll fit four models (homoskedastic, HDOP, fix type ["class"], and HDOP + fix type)
+# all other variable types have not been implemented in ctmm yet
+
+# format datasets
+t.none <- lapply(all.telemetry, function(t){ t$HDOP <- NULL; 
+                                             t$class <- NULL; t })
+
+t.HDOP <- lapply(all.telemetry, function(t){ t$class <- NULL; t })
+
+t.class <- lapply(all.telemetry, function(t){ t$HDOP <- NULL; t })
+
+t.HDOP.class <- all.telemetry
+
+# fit candidate models
+uere.none <- uere.fit(t.none)
+uere.HDOP <- uere.fit(t.HDOP)
+uere.class <- uere.fit(t.class)
+uere.HDOP.class <- uere.fit(t.HDOP.class)
+
+summary(list("homoskedastic" = uere.none,
+             "HDOP" = uere.HDOP,
+             "fix type" = uere.class,
+             "HDOP + fix type" = uere.HDOP.class))
+
+# the best model here is the one that combines HDOP + fix type
+summary(uere.HDOP.class)
+
+# these are the parameter estimates of the RMS UERE scale parameter, i.e., the SD of error
+# more variance with 3D fixes
+# overall, the goodness-of-fit is pretty bad (~6.26 Z[red]^2) - we want this to be near 1
+
+# save to file
+save(uere.HDOP.class, file = "Derived data/error_model.RData")
