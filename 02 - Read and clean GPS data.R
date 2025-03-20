@@ -5,7 +5,7 @@
 # Email: nathan.hooven@wsu.edu / nathan.d.hooven@gmail.com
 # Date began: 17 Mar 2025
 # Date completed: 17 Mar 2025
-# Date last modified: 17 Mar 2025
+# Date last modified: 20 Mar 2025
 # R version: 4.4.3
 
 #_______________________________________________________________________
@@ -13,6 +13,7 @@
 #_______________________________________________________________________
 
 # 17 Mar 2025 - PRE 055
+# 20 Mar 2025 - DUR 012
 
 #_______________________________________________________________________
 # 1. Load in packages ----
@@ -37,11 +38,11 @@ load("Derived data/error_model.RData")
 # VAR.xy (circular variance): 23,047
 
 # hare identifiers
-id.group <- "PRE"
-id.order <- "055"
-id.site <- "3C"
-id.sex <- "M"
-id.indiv <- 510
+id.group <- "DUR"
+id.order <- "012"
+id.site <- "3B"
+id.sex <- "F"
+id.indiv <- 1732
 id.deploy <- 1
 
 # read in .csv 
@@ -179,13 +180,17 @@ ggplot(data = hare.data.1,
   
   theme_bw() +
   
+  geom_path(color = "darkgray",
+            linetype = "dashed") +
+  
   geom_point() +
   
   scale_color_datetime(low = "lightgreen",
                        high = "darkblue") +
   
   theme(legend.position = "none",
-        axis.text.x = element_text(angle = 90)) -> coord.plot
+        axis.text.x = element_text(angle = 90),
+        axis.title = element_blank()) -> coord.plot
 
 # elevation and hdop
 ggplot(data = hare.data.1,
@@ -211,8 +216,9 @@ plot_grid(coord.plot, elev.plot)
 
 hare.data.2 <- hare.data.1 %>%
   
-  filter(height.msl > 1525 &
-           height.msl < 1650)
+  filter(height.msl > 1000 &
+           height.msl < 2000 &
+           location.lon < -119.8)
 
 #_______________________________________________________________________
 # 3d. Examine again ----
@@ -226,13 +232,17 @@ ggplot(data = hare.data.2,
   
   theme_bw() +
   
+  geom_path(color = "darkgray",
+            linetype = "dashed") +
+  
   geom_point() +
   
   scale_color_datetime(low = "lightgreen",
                        high = "darkblue") +
   
   theme(legend.position = "none",
-        axis.text.x = element_text(angle = 90)) -> coord.plot.2
+        axis.text.x = element_text(angle = 90),
+        axis.title = element_blank()) -> coord.plot.2
 
 # elevation and hdop
 ggplot(data = hare.data.2,
@@ -304,7 +314,7 @@ ggplot(data = hare.outliers,
   scale_color_viridis_c()
 
 # remove outliers (if necessary)
-out.rules <- hare.outliers$speed >= 0.04
+out.rules <- hare.outliers$distance > 300
 
 hare.telem.1 <- hare.telem[!out.rules, ]
 
@@ -317,7 +327,7 @@ hare.telem.1 <- hare.telem
 
 # days since capture variable
 # cap.date
-cap.date <- as.Date(mdy("01-23-2024", tz = "America/Los_Angeles"))
+cap.date <- as.Date(mdy("09-27-2023", tz = "America/Los_Angeles"))
 
 hare.telem.1$days.cap <- as.numeric(as.Date(hare.telem.1$timestamp) - cap.date)
 
@@ -326,9 +336,9 @@ hare.telem.1$days.cap <- as.numeric(as.Date(hare.telem.1$timestamp) - cap.date)
   # 1) the same day as mortality
   # 2) the same day as the collar was retrieved in the afternoon
 
-mort.date <- as.Date(mdy("02-22-2024", tz = "America/Los_Angeles"))
+mort.date <- as.Date(mdy("12-02-2023", tz = "America/Los_Angeles"))
 
-retr.date <- as.Date(mdy("01-31-2024", tz = "America/Los_Angeles"))
+retr.date <- as.Date(mdy("12-01-2023", tz = "America/Los_Angeles"))
 
 # if collar has a mort date, remove all relocations that day
 if (is.na(mort.date) == FALSE) {
@@ -371,6 +381,26 @@ hare.data.3 <- hare.telem.df %>%
          indiv = id.indiv,
          deploy = id.deploy)
 
+# plot track one last time
+ggplot(data = hare.data.3,
+       aes(x = longitude,
+           y = latitude,
+           color = timestamp)) +
+  
+  theme_bw() +
+  
+  geom_path(color = "darkgray",
+            linetype = "dashed") +
+  
+  geom_point() +
+  
+  scale_color_gradient(low = "lightgreen",
+                       high = "darkblue") +
+  
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90),
+        axis.title = element_blank())
+
 # write to .csv
 file.name <- paste0(id.order, "_", id.indiv, "_", id.deploy)
 
@@ -391,3 +421,4 @@ if (id.group == "PRE") {
   }
   
 }
+
