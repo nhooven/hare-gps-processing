@@ -39,11 +39,11 @@ load("Derived data/error_model.RData")
 # VAR.xy (circular variance): 23,047
 
 # hare identifiers
-id.group <- "POST"
-id.order <- "035"
+id.group <- "PRE"
+id.order <- "007"
 id.site <- "2B"
 id.sex <- "M"
-id.indiv <- 839
+id.indiv <- 1885
 id.deploy <- 1
 
 # read in .csv 
@@ -399,7 +399,8 @@ plot_grid(coord.plot, elev.plot)
 
 hare.data.2 <- hare.data.1 %>%
   
-  filter(height.msl > 1500)
+  filter(height.msl > 1600 &
+           height.msl < 1850)
 
 #_______________________________________________________________________
 # 3d. Examine again ----
@@ -508,7 +509,7 @@ hare.telem.1 <- hare.telem
 
 # days since capture variable
 # cap.date
-cap.date <- as.Date(mdy("08-20-2024", tz = "America/Los_Angeles"))
+cap.date <- as.Date(mdy("10-17-2022", tz = "America/Los_Angeles"))
 
 hare.telem.1$days.cap <- as.numeric(as.Date(hare.telem.1$timestamp) - cap.date)
 
@@ -517,9 +518,9 @@ hare.telem.1$days.cap <- as.numeric(as.Date(hare.telem.1$timestamp) - cap.date)
   # 1) the same day as mortality
   # 2) the same day as the collar was retrieved in the afternoon
 
-mort.date <- as.Date(mdy("01-04-2025", tz = "America/Los_Angeles"))
+mort.date <- NA
 
-retr.date <- as.Date(mdy("01-22-2025", tz = "America/Los_Angeles"))
+retr.date <- as.Date(mdy("03-30-2023", tz = "America/Los_Angeles"))
 
 # if collar has a mort date, remove all relocations that day
 if (is.na(mort.date) == FALSE) {
