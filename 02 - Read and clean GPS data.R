@@ -5,7 +5,7 @@
 # Email: nathan.hooven@wsu.edu / nathan.d.hooven@gmail.com
 # Date began: 17 Mar 2025
 # Date completed: 17 Mar 2025
-# Date last modified: 20 Mar 2025
+# Date last modified: 21 Mar 2025
 # R version: 4.4.3
 
 #_______________________________________________________________________
@@ -14,6 +14,7 @@
 
 # 17 Mar 2025 - PRE 055
 # 20 Mar 2025 - DUR 012
+# 21 Mar 2025 - POST 040
 
 #_______________________________________________________________________
 # 1. Load in packages ----
@@ -38,11 +39,11 @@ load("Derived data/error_model.RData")
 # VAR.xy (circular variance): 23,047
 
 # hare identifiers
-id.group <- "DUR"
-id.order <- "012"
-id.site <- "3B"
-id.sex <- "F"
-id.indiv <- 1732
+id.group <- "POST"
+id.order <- "035"
+id.site <- "2B"
+id.sex <- "M"
+id.indiv <- 839
 id.deploy <- 1
 
 # read in .csv 
@@ -127,7 +128,71 @@ if ("Timestamp" %in% names(hare.data)) {
 
 } else {
   
-  # cleaning step
+  if ("Pressure" %in% names(hare.data)) {
+    
+    names(hare.data) <- c("TagID",
+                          "Date",
+                          "Time",
+                          "X",
+                          "Y",
+                          "Z",
+                          "Activity",
+                          "location.lat",
+                          "location.lon",
+                          "height.msl",
+                          "ground.speed",
+                          "satellites",
+                          "hdop",
+                          "signal.strength",
+                          "Battery",
+                          "1",
+                          "2",
+                          "3",
+                          "4",
+                          "5")
+    
+    # cleaning step
+    hare.data.1 <- hare.data %>%
+      
+      # keep only lat-long entries
+      mutate(location.lon = as.numeric(location.lon),
+             location.lat = as.numeric(location.lat)) %>%
+      
+      # keep locations within reasonable window
+      filter(location.lon > -121 & location.lon < -117 &
+               location.lat > 47 & location.lat < 50) %>%
+      
+      # create timestamp and coerce to POSIXct
+      mutate(timestamp = dmy_hms(paste0(Date, " ", Time),
+                                 tz = "UTC")) %>%
+      
+      # coerce to correct timezone
+      mutate(timestamp = with_tz(timestamp,
+                                 tzone = "America/Los_Angeles")) %>%
+      
+      # keep columns we want
+      dplyr::select(location.lon, 
+                    location.lat,
+                    timestamp,
+                    height.msl,
+                    satellites,
+                    hdop) %>%
+      
+      # coerce required columns
+      mutate_at(.vars = c("location.lon",
+                          "location.lat",
+                          "height.msl",
+                          "hdop"),
+                .funs = as.numeric) %>%
+      
+      # drop any NAs in the key columns
+      drop_na(location.lon,
+              location.lat,
+              timestamp)
+    
+  } else {
+    
+    # cleaning step
   hare.data.1 <- hare.data %>%
     
     # keep only lat-long entries
@@ -165,8 +230,126 @@ if ("Timestamp" %in% names(hare.data)) {
     drop_na(location.lon,
             location.lat,
             timestamp)
+    
+  }
   
 }
+
+# work with strange 040_1240_1.csv data
+# filter out strange locations
+#weird.hare.data.1 <- hare.data %>%
+  
+#  mutate(location.lat = as.numeric(location.lat)) %>%
+  
+#  filter(Temp. < 48 &
+#         location.lat > -120 & location.lat < -119)
+
+# change names
+#names(weird.hare.data.1) <- c("TagID",
+#                              "Date",
+#                              "Time",
+#                              "X",
+#                              "Y",
+#                              "Z",
+#                              "Activity",
+#                              "Temp.",
+#                              "location.lat",
+#                              "location.lon",
+#                              "height.msl",
+#                              "ground.speed",
+#                              "satellites",
+#                              "hdop",
+#                              "signal.strength",
+#                              c(1:6))
+
+# keep only columns we need
+#weird.hare.data.1 <- weird.hare.data.1 %>%
+  
+#  dplyr::select(TagID,
+#                Date,
+#                Time,
+#                location.lat,
+#                location.lon,
+#                height.msl,
+#                satellites,
+#                hdop)
+
+# next section
+#weird.hare.data.2 <- hare.data %>%
+  
+#  mutate(X..C. = as.numeric(X..C.)) %>%
+#  
+#  filter(Temp. > 48 &
+#           X..C. > -120 & X..C. < -119)
+
+# change names
+#names(weird.hare.data.2) <- c("TagID",
+#                              "Date",
+#                              "Time",
+#                              "X",
+#                              "Y",
+#                              "Z",
+#                              "Activity",
+#                              "location.lat",
+#                              "location.lon",
+#                              "height.msl",
+#                              "ground.speed",
+#                              "satellites",
+#                              "hdop",
+#                              "signal.strength",
+#                              c(1:7))
+
+# keep only columns we need
+#weird.hare.data.2 <- weird.hare.data.2 %>%
+  
+#  dplyr::select(TagID,
+#                Date,
+#                Time,
+#                location.lat,
+#                location.lon,
+#                height.msl,
+#                satellites,
+#                hdop)
+
+# bind together and complete final cleaning step
+#hare.data.1 <- weird.hare.data.1 %>%
+  
+  # correct format
+#  mutate(location.lat = as.numeric(location.lat),
+#         height.msl = as.character(height.msl)) %>%
+#  
+#  bind_rows(weird.hare.data.2) %>%
+  
+  # create timestamp and coerce to POSIXct
+#  mutate(timestamp = dmy_hms(paste0(Date, " ", Time),
+#                             tz = "UTC")) %>%
+  
+  # coerce to correct timezone
+#  mutate(timestamp = with_tz(timestamp,
+#                             tzone = "America/Los_Angeles")) %>%
+  
+  # keep columns we want
+#  dplyr::select(location.lon, 
+#                location.lat,
+#                timestamp,
+#                height.msl,
+#                satellites,
+#                hdop) %>%
+  
+  # coerce required columns
+#  mutate_at(.vars = c("location.lon",
+#                      "location.lat",
+#                      "height.msl",
+#                      "hdop"),
+#            .funs = as.numeric) %>%
+  
+  # drop any NAs in the key columns
+#  drop_na(location.lon,
+#          location.lat,
+#          timestamp) %>%
+  
+  # arrange by timestamp
+#  arrange(timestamp)
 
 #_______________________________________________________________________
 # 3b. Examine obviously erroneous relocations ----
@@ -216,9 +399,7 @@ plot_grid(coord.plot, elev.plot)
 
 hare.data.2 <- hare.data.1 %>%
   
-  filter(height.msl > 1000 &
-           height.msl < 2000 &
-           location.lon < -119.8)
+  filter(height.msl > 1500)
 
 #_______________________________________________________________________
 # 3d. Examine again ----
@@ -314,7 +495,7 @@ ggplot(data = hare.outliers,
   scale_color_viridis_c()
 
 # remove outliers (if necessary)
-out.rules <- hare.outliers$distance > 300
+out.rules <- hare.outliers$speed > 0.04
 
 hare.telem.1 <- hare.telem[!out.rules, ]
 
@@ -327,7 +508,7 @@ hare.telem.1 <- hare.telem
 
 # days since capture variable
 # cap.date
-cap.date <- as.Date(mdy("09-27-2023", tz = "America/Los_Angeles"))
+cap.date <- as.Date(mdy("08-20-2024", tz = "America/Los_Angeles"))
 
 hare.telem.1$days.cap <- as.numeric(as.Date(hare.telem.1$timestamp) - cap.date)
 
@@ -336,9 +517,9 @@ hare.telem.1$days.cap <- as.numeric(as.Date(hare.telem.1$timestamp) - cap.date)
   # 1) the same day as mortality
   # 2) the same day as the collar was retrieved in the afternoon
 
-mort.date <- as.Date(mdy("12-02-2023", tz = "America/Los_Angeles"))
+mort.date <- as.Date(mdy("01-04-2025", tz = "America/Los_Angeles"))
 
-retr.date <- as.Date(mdy("12-01-2023", tz = "America/Los_Angeles"))
+retr.date <- as.Date(mdy("01-22-2025", tz = "America/Los_Angeles"))
 
 # if collar has a mort date, remove all relocations that day
 if (is.na(mort.date) == FALSE) {
