@@ -5,7 +5,7 @@
 # Email: nathan.hooven@wsu.edu / nathan.d.hooven@gmail.com
 # Date began: 17 Mar 2025
 # Date completed: 17 Mar 2025
-# Date last modified: 21 Mar 2025
+# Date last modified: 24 Mar 2025
 # R version: 4.4.3
 
 #_______________________________________________________________________
@@ -39,11 +39,11 @@ load("Derived data/error_model.RData")
 # VAR.xy (circular variance): 23,047
 
 # hare identifiers
-id.group <- "PRE"
-id.order <- "007"
-id.site <- "2B"
+id.group <- "DUR"
+id.order <- "004"
+id.site <- "2A"
 id.sex <- "M"
-id.indiv <- 1885
+id.indiv <- 1883
 id.deploy <- 1
 
 # read in .csv 
@@ -399,8 +399,8 @@ plot_grid(coord.plot, elev.plot)
 
 hare.data.2 <- hare.data.1 %>%
   
-  filter(height.msl > 1600 &
-           height.msl < 1850)
+  filter(height.msl < 1800 &
+           location.lat < 48.865)
 
 #_______________________________________________________________________
 # 3d. Examine again ----
@@ -496,7 +496,7 @@ ggplot(data = hare.outliers,
   scale_color_viridis_c()
 
 # remove outliers (if necessary)
-out.rules <- hare.outliers$speed > 0.04
+out.rules <- hare.outliers$distance > 400
 
 hare.telem.1 <- hare.telem[!out.rules, ]
 
@@ -509,7 +509,7 @@ hare.telem.1 <- hare.telem
 
 # days since capture variable
 # cap.date
-cap.date <- as.Date(mdy("10-17-2022", tz = "America/Los_Angeles"))
+cap.date <- as.Date(mdy("09-21-2023", tz = "America/Los_Angeles"))
 
 hare.telem.1$days.cap <- as.numeric(as.Date(hare.telem.1$timestamp) - cap.date)
 
@@ -518,9 +518,9 @@ hare.telem.1$days.cap <- as.numeric(as.Date(hare.telem.1$timestamp) - cap.date)
   # 1) the same day as mortality
   # 2) the same day as the collar was retrieved in the afternoon
 
-mort.date <- NA
+mort.date <- as.Date(mdy("11-04-2023", tz = "America/Los_Angeles"))
 
-retr.date <- as.Date(mdy("03-30-2023", tz = "America/Los_Angeles"))
+retr.date <- as.Date(mdy("04-18-2023", tz = "America/Los_Angeles"))
 
 # if collar has a mort date, remove all relocations that day
 if (is.na(mort.date) == FALSE) {

@@ -4,8 +4,8 @@
 # Author: Nathan D. Hooven, Graduate Research Assistant
 # Email: nathan.hooven@wsu.edu / nathan.d.hooven@gmail.com
 # Date began: 21 Mar 2025
-# Date completed: 
-# Date last modified: 21 Mar 2025
+# Date completed: 24 Mar 2025
+# Date last modified: 24 Mar 2025
 # R version: 4.4.3
 
 #_______________________________________________________________________
@@ -39,7 +39,7 @@ list.post <- list.files(dir.post)
 load("Derived data/error_model.RData")
 
 # read in .csv 
-(focal.csv <- list.pre[6])
+(focal.csv <- list.pre[42])
 
 hare.data <- read.csv(paste0(dir.pre,
                              focal.csv))        
