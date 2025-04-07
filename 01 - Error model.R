@@ -5,7 +5,7 @@
 # Email: nathan.hooven@wsu.edu / nathan.d.hooven@gmail.com
 # Date began: 17 Jun 2023
 # Date completed: 17 Jun 2023
-# Date last modified: 17 Mar 2025
+# Date last modified: 07 Apr 2025
 # R version: 4.2.2  
 
 #_______________________________________________________________________________________________
@@ -83,8 +83,10 @@ all.data <- all.data %>%
 # create timestamp
 all.data.1 <- all.data %>% 
   
-  mutate(timestamp = mdy_hms(paste(Date, Time),
-                             tz = "UTC")) %>%
+  mutate(timestamp = dmy_hms(paste(Date, Time),
+                             tz = "UTC"),
+         ground.speed = as.numeric(ground.speed),
+         satellites = as.integer(satellites)) %>%
   
   # select only columns we need
   dplyr::select(TagID, 
@@ -95,7 +97,11 @@ all.data.1 <- all.data %>%
                 ground.speed, 
                 satellites, 
                 hdop, 
-                signal.strength)
+                signal.strength) %>%
+  
+  # remove anything with a > 0 ground speed and < 3 satellites
+  filter(ground.speed == 0 &
+         satellites > 2)
 
 # make telemetry objects - loop through all and pack into list
 all.telemetry <- list()
@@ -189,7 +195,7 @@ ggplot() +
            ylim = c(5403505,
                     5403600)) +
   
-  scale_color_viridis_d()
+  scale_color_viridis_c()
 
 #_______________________________________________________________________________________________
 # 4b. First 10 devices ----
@@ -225,7 +231,7 @@ ggplot() +
            ylim = c(5403505,
                     5403600)) +
   
-  scale_color_viridis_d()
+  scale_color_viridis_c()
 
 #_______________________________________________________________________________________________
 # 4c. Second 10 devices ----
@@ -261,7 +267,7 @@ ggplot() +
            ylim = c(5403505,
                     5403600)) +
   
-  scale_color_viridis_d()
+  scale_color_viridis_c()
 
 #_______________________________________________________________________________________________
 # 5. Fit error model ----
@@ -280,7 +286,7 @@ t.class <- lapply(all.telemetry, function(t){ t$HDOP <- NULL; t })
 
 t.HDOP.class <- all.telemetry
 
-# fit candidate models
+# fit pooled models
 uere.none <- uere.fit(t.none)
 uere.HDOP <- uere.fit(t.HDOP)
 uere.class <- uere.fit(t.class)
@@ -291,12 +297,62 @@ summary(list("homoskedastic" = uere.none,
              "fix type" = uere.class,
              "HDOP + fix type" = uere.HDOP.class))
 
-# the best model here is the one that combines HDOP + fix type
-summary(uere.HDOP.class)
+# fit individual models
+ueres.none <- lapply(t.none, uere.fit)
+ueres.HDOP <- lapply(t.HDOP, uere.fit)
+ueres.class <- lapply(t.class, uere.fit)
+ueres.HDOP.class <- lapply(t.HDOP.class, uere.fit)
 
-# these are the parameter estimates of the RMS UERE scale parameter, i.e., the SD of error
-# more variance with 3D fixes
-# overall, the goodness-of-fit is pretty bad (~6.26 Z[red]^2) - we want this to be near 1
+summary(list("joint - homoskedastic" = uere.none,
+             "joint - HDOP" = uere.HDOP,
+             "joint - fix type" = uere.class,
+             "joint - HDOP + fix type" = uere.HDOP.class,
+             "indiv - homoskedastic" = ueres.none,
+             "indiv - HDOP" = ueres.HDOP,
+             "indiv - fix type" = ueres.class,
+             "indiv - HDOP + fix type" = ueres.HDOP.class))
+
+# the best model here is the individual one that combines HDOP + fix type
+# this means there is a ton of variability across tags
+summary(ueres.HDOP)
+
+# many of these have Z2 statistics within the 4-ish threshold reported by Fleming et al.
+# I'll remove the poor-fitting collars (11 and 8) and re-fit
+best.uere.none <- uere.fit(t.none[c(1:7, 9:10, 12:20)])
+best.uere.HDOP <- uere.fit(t.HDOP[c(1:7, 9:10, 12:20)])
+best.uere.class <- uere.fit(t.class[c(1:7, 9:10, 12:20)])
+best.uere.HDOP.class <- uere.fit(t.HDOP.class[c(1:7, 9:10, 12:20)])
+
+summary(list("homoskedastic" = best.uere.none,
+             "HDOP" = best.uere.HDOP,
+             "fix type" = best.uere.class,
+             "HDOP + fix type" = best.uere.HDOP.class))
+
+# by removing these two problematic collars, we dropped out Z^2 to 3.04
+# and really reduced the estimated RMS error
+
+summary(best.uere.HDOP.class)
 
 # save to file
-save(uere.HDOP.class, file = "Derived data/error_model.RData")
+save(best.uere.HDOP.class, file = "Derived data/error_model.RData")
+
+#_______________________________________________________________________________________________
+# 6. Look at how well we did ----
+#_______________________________________________________________________________________________
+
+# assign RMS UERE to entire dataset
+uere(all.telemetry[c(1:7, 9:10, 12:20)]) <- best.uere.HDOP.class
+
+# calculate residuals of calibration data
+RES <- lapply(all.telemetry[c(1:7, 9:10, 12:20)], residuals)
+
+# scatter plot of residuals with 50%, 95%, and 99.9% coverage areas
+plot(RES, col.DF=NA, level.UD=c(0.50,0.95,0.999))
+
+# check calibration data for autocorrelation using fast=FALSE because samples are small
+ACFS <- lapply(RES, function(R){correlogram(R,fast=FALSE,dt=10 %#% 'min',trace=FALSE)})
+
+# pooling ACFs
+ACF <- mean(ACFS)
+
+plot(ACF)
